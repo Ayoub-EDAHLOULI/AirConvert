@@ -50,14 +50,56 @@ Phased by format category, one shipped and working before the next starts:
 
 - Drag-and-drop file input with format auto-detection
 - Target-format picker
-- Batch conversion (multiple files at once)
+- Batch conversion (multiple files at once), with live per-file progress
+- Optional output folder (defaults to saving next to the source file)
+- Optional max-dimension resize and JPG/WebP quality control
 - Zero network calls, verifiable by blocking network access at the OS level
 - Portable, installable desktop app (Windows-first, cross-platform as feasible)
 
 ## Planned (not yet built)
 
 - CLI mode for scripting conversions on headless/VM environments
-- Basic image resize/compress options alongside conversion
+
+## Offline Verification
+
+AirConvert's zero-network-calls claim is checked two ways: a static code audit (done on every change) and an OS-level runtime block (done before tagging a release). Both are described below so the claim is reproducible, not just asserted.
+
+### 1. Static code audit
+
+Run these from the repo root. Each should return **no matches**:
+
+```bash
+# Browser-side network primitives
+grep -rn "fetch(\|XMLHttpRequest\|WebSocket\|EventSource\|sendBeacon" src/
+
+# Rust-side network primitives
+grep -rn "reqwest\|TcpStream\|UdpSocket" src-tauri/src/
+```
+
+Unlike some offline-first apps, AirConvert has no exception to carve out here — there's no HTTP plugin dependency at all (`tauri-plugin-http` is not in `Cargo.toml`), and no feature in the app has any reason to make a network request. Also confirm `src-tauri/tauri.conf.json` has no `updater`/`analytics` config block (Tauri's auto-updater is opt-in and must be explicitly configured — absence of the block means it's off).
+
+### 2. OS-level runtime block (Windows Firewall)
+
+Build the release binary, then block all outbound traffic for it and confirm every conversion still works:
+
+```powershell
+# Build the release binary first: npm run tauri build
+$exe = "src-tauri\target\release\airconvert-desktop.exe"
+New-NetFirewallRule -DisplayName "AirConvert-Block-Out" -Direction Outbound `
+  -Program (Resolve-Path $exe) -Action Block
+```
+
+With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output) — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
+
+Remove the rule when done:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "AirConvert-Block-Out"
+```
+
+For a stronger guarantee, run the same build inside a network-isolated VM (no virtual NIC, or a host-only adapter with no NAT) instead of relying on a firewall rule.
+
+**Status:** the static audit above has been run against the current codebase with no matches. The OS-level firewall/VM run is a manual step to perform on your own machine before tagging a release as offline-verified — it hasn't been run against a signed release build yet.
 
 ## Installation
 

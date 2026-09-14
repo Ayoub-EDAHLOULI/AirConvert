@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use tauri::Emitter;
 
 /// Formats we accept as conversion output. SVG is intentionally excluded:
 /// resvg/usvg only get us rasterization (SVG -> bitmap), not bitmap -> SVG.
@@ -70,7 +71,19 @@ impl OutputFormat {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversionOptions {
+    /// JPEG/WebP encoding quality, 1-100. Ignored by formats that don't
+    /// support lossy quality (png, bmp, tiff, ico, tga, pnm, qoi).
+    pub quality: Option<u8>,
+    /// Scale the image down to fit within this many pixels on its longest
+    /// side, preserving aspect ratio. Images already smaller are left
+    /// untouched — this only ever downsizes, never upscales.
+    pub max_dimension: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct ConversionResult {
     pub source_path: String,
     pub success: bool,
@@ -105,6 +118,7 @@ fn convert_one(
     source_path: &Path,
     target_format: OutputFormat,
     output_dir: Option<&Path>,
+    options: ConversionOptions,
 ) -> ConversionResult {
     let source_ext = source_path
         .extension()
@@ -117,7 +131,10 @@ fn convert_one(
         // We only bundle the AVIF encoder (ravif), not the decoder
         // (dav1d), to keep the binary lean. Reject up front instead of
         // letting `image::open` fail with a confusing generic error.
-        Err("AVIF input is not supported yet — AVIF can only be a conversion target, not a source".to_string())
+        Err(
+            "AVIF input is not supported yet — AVIF can only be a conversion target, not a source"
+                .to_string(),
+        )
     } else {
         image::open(source_path).map_err(|e| format!("Failed to read image: {e}"))
     };
@@ -127,12 +144,42 @@ fn convert_one(
         Err(message) => return ConversionResult::err(source_path, message),
     };
 
+    let img = match options.max_dimension {
+        Some(max_dim) if img.width().max(img.height()) > max_dim => {
+            img.resize(max_dim, max_dim, image::imageops::FilterType::Lanczos3)
+        }
+        _ => img,
+    };
+
     let output_path = unique_output_path(source_path, target_format.extension(), output_dir);
 
-    match img.save_with_format(&output_path, target_format.image_format()) {
+    let save_result = match (target_format, options.quality) {
+        (OutputFormat::Jpeg, Some(quality)) => save_jpeg_with_quality(&img, &output_path, quality),
+        (OutputFormat::WebP, Some(_)) => {
+            // image's WebP encoder is lossless-only; a quality knob isn't
+            // available without pulling in libwebp bindings, so we ignore
+            // the requested quality here rather than pretend to honor it.
+            img.save_with_format(&output_path, target_format.image_format())
+        }
+        _ => img.save_with_format(&output_path, target_format.image_format()),
+    };
+
+    match save_result {
         Ok(()) => ConversionResult::ok(source_path, output_path),
         Err(e) => ConversionResult::err(source_path, format!("Failed to write output: {e}")),
     }
+}
+
+fn save_jpeg_with_quality(
+    img: &image::DynamicImage,
+    output_path: &Path,
+    quality: u8,
+) -> image::ImageResult<()> {
+    let file = std::fs::File::create(output_path).map_err(image::ImageError::IoError)?;
+    let mut writer = std::io::BufWriter::new(file);
+    let mut encoder =
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, quality.clamp(1, 100));
+    encoder.encode_image(img)
 }
 
 /// Builds an output path that never collides with an existing file. The
@@ -186,7 +233,11 @@ fn rasterize_svg(source_path: &Path) -> Result<image::DynamicImage, String> {
     let mut pixmap = tiny_skia::Pixmap::new(width, height)
         .ok_or_else(|| "Invalid SVG dimensions".to_string())?;
 
-    resvg::render(&tree, tiny_skia::Transform::identity(), &mut pixmap.as_mut());
+    resvg::render(
+        &tree,
+        tiny_skia::Transform::identity(),
+        &mut pixmap.as_mut(),
+    );
 
     let rgba = image::RgbaImage::from_raw(width, height, pixmap.data().to_vec())
         .ok_or_else(|| "Failed to build image buffer from rendered SVG".to_string())?;
@@ -194,17 +245,44 @@ fn rasterize_svg(source_path: &Path) -> Result<image::DynamicImage, String> {
     Ok(image::DynamicImage::ImageRgba8(rgba))
 }
 
+#[derive(Debug, Serialize, Clone)]
+struct ConversionProgress {
+    completed: usize,
+    total: usize,
+    result: ConversionResult,
+}
+
 #[tauri::command]
 pub fn convert_images(
+    app: tauri::AppHandle,
     paths: Vec<String>,
     target_format: String,
     output_dir: Option<String>,
+    options: Option<ConversionOptions>,
 ) -> Result<Vec<ConversionResult>, String> {
     let target_format = OutputFormat::parse(&target_format)?;
     let output_dir = output_dir.as_deref().map(Path::new);
+    let options = options.unwrap_or(ConversionOptions {
+        quality: None,
+        max_dimension: None,
+    });
+    let total = paths.len();
 
-    Ok(paths
-        .iter()
-        .map(|path| convert_one(Path::new(path), target_format, output_dir))
-        .collect())
+    let mut results = Vec::with_capacity(total);
+    for (index, path) in paths.iter().enumerate() {
+        let result = convert_one(Path::new(path), target_format, output_dir, options);
+
+        let _ = app.emit(
+            "conversion-progress",
+            ConversionProgress {
+                completed: index + 1,
+                total,
+                result: result.clone(),
+            },
+        );
+
+        results.push(result);
+    }
+
+    Ok(results)
 }
