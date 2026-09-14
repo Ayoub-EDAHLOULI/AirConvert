@@ -22,29 +22,29 @@ Cloud converters (Convertio, CloudConvert, etc.) upload your file to a server, c
 
 Phased by format category, one shipped and working before the next starts:
 
-| Phase       | Category     | Formats                                                                    | Approach                                                                  |
-| ----------- | ------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Phase       | Category     | Formats                                                                     | Approach                                                                  |
+| ----------- | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | 1 (current) | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
-| 2           | Audio        | mp3, wav, flac, ogg, m4a                                                   | Bundled FFmpeg (LGPL build) sidecar                                       |
-| 3           | Documents    | md, txt, html, rtf, odt, docx                                              | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
-| 4           | Spreadsheets | csv, xlsx, ods                                                             | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
-| 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                   | FFmpeg sidecar                                                            |
+| 2           | Audio        | mp3, wav, flac, ogg, m4a                                                    | Bundled FFmpeg (LGPL build) sidecar                                       |
+| 3           | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
+| 4           | Spreadsheets | csv, xlsx, ods                                                              | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
+| 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
 
 **Deliberately out of scope for now:**
 
 - **HEIC** — excluded due to HEVC patent licensing ambiguity around redistribution, not a technical limitation.
-- **AVIF as an input format** — AirConvert can convert *to* AVIF, but not *from* it. Decoding AVIF needs the `dav1d` decoder, a much heavier dependency than the `ravif` encoder alone; may be added later if there's real demand.
+- **AVIF as an input format** — AirConvert can convert _to_ AVIF, but not _from_ it. Decoding AVIF needs the `dav1d` decoder, a much heavier dependency than the `ravif` encoder alone; may be added later if there's real demand.
 - **Full-fidelity Office documents** (complex docx/xlsx/pptx with embedded objects, macros, exact layout preservation) — this realistically requires a full LibreOffice headless install (700MB+), which conflicts with the goal of a small, portable, offline-first bundle. May be revisited later as an optional detected-if-installed backend, never bundled by default.
 - **PDF editing** (merge/split/compress) — planned as a separate "offline PDF toolkit" project, kept out of this repo's scope to keep it focused on format _conversion_.
 
 ## Engine choices and trade-offs
 
-| Engine                         | Used for     | Why                                                                                                                    |
-| ------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Rust `image` + `resvg`         | Images       | Compiles directly into the binary — no subprocess, no license concerns, minimal size impact                            |
-| FFmpeg (LGPL build)            | Audio, Video | Industry-standard, well understood bundling pattern (same approach used by apps like HandBrake)                        |
-| Pandoc                         | Documents    | Single-binary sidecar, handles markup-style formats well; explicitly not a fidelity-preserving office-document engine   |
-| `calamine` / `rust_xlsxwriter` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine                                            |
+| Engine                         | Used for     | Why                                                                                                                   |
+| ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Rust `image` + `resvg`         | Images       | Compiles directly into the binary — no subprocess, no license concerns, minimal size impact                           |
+| FFmpeg (LGPL build)            | Audio, Video | Industry-standard, well understood bundling pattern (same approach used by apps like HandBrake)                       |
+| Pandoc                         | Documents    | Single-binary sidecar, handles markup-style formats well; explicitly not a fidelity-preserving office-document engine |
+| `calamine` / `rust_xlsxwriter` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine                                          |
 
 ## Features
 
@@ -82,4 +82,4 @@ MIT (see [LICENSE](LICENSE))
 
 ## Author
 
-**Ayoub El Dahlouli** — [GitHub](https://github.com/Ayoub-EDAHLOULI)
+**Ayoub Edahlouli** — [GitHub](https://github.com/Ayoub-EDAHLOULI)
