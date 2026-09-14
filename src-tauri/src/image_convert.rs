@@ -98,11 +98,42 @@ fn convert_one(source_path: &Path, target_format: OutputFormat) -> ConversionRes
         Err(message) => return ConversionResult::err(source_path, message),
     };
 
-    let output_path = source_path.with_extension(target_format.extension());
+    let output_path = unique_output_path(source_path, target_format.extension());
 
     match img.save_with_format(&output_path, target_format.image_format()) {
         Ok(()) => ConversionResult::ok(source_path, output_path),
         Err(e) => ConversionResult::err(source_path, format!("Failed to write output: {e}")),
+    }
+}
+
+/// Builds an output path that never collides with an existing file: if
+/// `source.with_extension(new_ext)` already exists (including the case
+/// where source and target format are the same, which would otherwise
+/// overwrite the original), appends "-converted", then "-converted-2", etc.
+fn unique_output_path(source_path: &Path, new_ext: &str) -> PathBuf {
+    let candidate = source_path.with_extension(new_ext);
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let stem = source_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let parent = source_path.parent().unwrap_or_else(|| Path::new(""));
+
+    let mut counter = 1;
+    loop {
+        let file_name = if counter == 1 {
+            format!("{stem}-converted.{new_ext}")
+        } else {
+            format!("{stem}-converted-{counter}.{new_ext}")
+        };
+        let candidate = parent.join(file_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
     }
 }
 

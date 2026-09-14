@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 type Theme = "light" | "dark";
 
@@ -18,6 +19,7 @@ export function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem(STORAGE_KEY, theme);
+    invoke("set_window_theme", { theme }).catch(() => {});
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
