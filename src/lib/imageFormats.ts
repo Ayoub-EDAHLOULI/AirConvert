@@ -8,6 +8,10 @@ export const SUPPORTED_INPUT_EXTENSIONS = [
   "tiff",
   "tif",
   "svg",
+  "ico",
+  "tga",
+  "pnm",
+  "qoi",
 ] as const;
 
 export const OUTPUT_FORMATS = [
@@ -17,6 +21,11 @@ export const OUTPUT_FORMATS = [
   { value: "gif", label: "GIF" },
   { value: "bmp", label: "BMP" },
   { value: "tiff", label: "TIFF" },
+  { value: "ico", label: "ICO" },
+  { value: "tga", label: "TGA" },
+  { value: "pnm", label: "PNM" },
+  { value: "qoi", label: "QOI" },
+  { value: "avif", label: "AVIF" },
 ] as const;
 
 export type OutputFormatValue = (typeof OUTPUT_FORMATS)[number]["value"];

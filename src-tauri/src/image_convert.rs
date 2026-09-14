@@ -12,6 +12,11 @@ pub enum OutputFormat {
     Gif,
     Bmp,
     Tiff,
+    Ico,
+    Tga,
+    Pnm,
+    Qoi,
+    Avif,
 }
 
 impl OutputFormat {
@@ -23,6 +28,11 @@ impl OutputFormat {
             "gif" => Ok(Self::Gif),
             "bmp" => Ok(Self::Bmp),
             "tiff" | "tif" => Ok(Self::Tiff),
+            "ico" => Ok(Self::Ico),
+            "tga" => Ok(Self::Tga),
+            "pnm" => Ok(Self::Pnm),
+            "qoi" => Ok(Self::Qoi),
+            "avif" => Ok(Self::Avif),
             other => Err(format!("Unsupported target format: {other}")),
         }
     }
@@ -35,6 +45,11 @@ impl OutputFormat {
             Self::Gif => image::ImageFormat::Gif,
             Self::Bmp => image::ImageFormat::Bmp,
             Self::Tiff => image::ImageFormat::Tiff,
+            Self::Ico => image::ImageFormat::Ico,
+            Self::Tga => image::ImageFormat::Tga,
+            Self::Pnm => image::ImageFormat::Pnm,
+            Self::Qoi => image::ImageFormat::Qoi,
+            Self::Avif => image::ImageFormat::Avif,
         }
     }
 
@@ -46,6 +61,11 @@ impl OutputFormat {
             Self::Gif => "gif",
             Self::Bmp => "bmp",
             Self::Tiff => "tiff",
+            Self::Ico => "ico",
+            Self::Tga => "tga",
+            Self::Pnm => "pnm",
+            Self::Qoi => "qoi",
+            Self::Avif => "avif",
         }
     }
 }
@@ -78,17 +98,26 @@ impl ConversionResult {
     }
 }
 
-/// Converts a single file to the target format, writing the output next to
-/// the source file (same stem, new extension). Never panics: every failure
-/// mode is captured in the returned `ConversionResult`.
-fn convert_one(source_path: &Path, target_format: OutputFormat) -> ConversionResult {
-    let decoded = if source_path
+/// Converts a single file to the target format, writing the output either
+/// next to the source file or into `output_dir` if given. Never panics:
+/// every failure mode is captured in the returned `ConversionResult`.
+fn convert_one(
+    source_path: &Path,
+    target_format: OutputFormat,
+    output_dir: Option<&Path>,
+) -> ConversionResult {
+    let source_ext = source_path
         .extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("svg"))
-        .unwrap_or(false)
-    {
+        .unwrap_or("");
+
+    let decoded = if source_ext.eq_ignore_ascii_case("svg") {
         rasterize_svg(source_path)
+    } else if source_ext.eq_ignore_ascii_case("avif") {
+        // We only bundle the AVIF encoder (ravif), not the decoder
+        // (dav1d), to keep the binary lean. Reject up front instead of
+        // letting `image::open` fail with a confusing generic error.
+        Err("AVIF input is not supported yet — AVIF can only be a conversion target, not a source".to_string())
     } else {
         image::open(source_path).map_err(|e| format!("Failed to read image: {e}"))
     };
@@ -98,7 +127,7 @@ fn convert_one(source_path: &Path, target_format: OutputFormat) -> ConversionRes
         Err(message) => return ConversionResult::err(source_path, message),
     };
 
-    let output_path = unique_output_path(source_path, target_format.extension());
+    let output_path = unique_output_path(source_path, target_format.extension(), output_dir);
 
     match img.save_with_format(&output_path, target_format.image_format()) {
         Ok(()) => ConversionResult::ok(source_path, output_path),
@@ -106,21 +135,24 @@ fn convert_one(source_path: &Path, target_format: OutputFormat) -> ConversionRes
     }
 }
 
-/// Builds an output path that never collides with an existing file: if
-/// `source.with_extension(new_ext)` already exists (including the case
-/// where source and target format are the same, which would otherwise
-/// overwrite the original), appends "-converted", then "-converted-2", etc.
-fn unique_output_path(source_path: &Path, new_ext: &str) -> PathBuf {
-    let candidate = source_path.with_extension(new_ext);
-    if !candidate.exists() {
-        return candidate;
-    }
-
+/// Builds an output path that never collides with an existing file. The
+/// output folder is `output_dir` if given, otherwise the source file's own
+/// folder. If the natural `stem.new_ext` name already exists there
+/// (including the case where source and target format are the same, which
+/// would otherwise overwrite the original), appends "-converted", then
+/// "-converted-2", etc.
+fn unique_output_path(source_path: &Path, new_ext: &str, output_dir: Option<&Path>) -> PathBuf {
     let stem = source_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
-    let parent = source_path.parent().unwrap_or_else(|| Path::new(""));
+    let source_parent = source_path.parent().unwrap_or_else(|| Path::new(""));
+    let parent = output_dir.unwrap_or(source_parent);
+
+    let candidate = parent.join(format!("{stem}.{new_ext}"));
+    if !candidate.exists() {
+        return candidate;
+    }
 
     let mut counter = 1;
     loop {
@@ -163,11 +195,16 @@ fn rasterize_svg(source_path: &Path) -> Result<image::DynamicImage, String> {
 }
 
 #[tauri::command]
-pub fn convert_images(paths: Vec<String>, target_format: String) -> Result<Vec<ConversionResult>, String> {
+pub fn convert_images(
+    paths: Vec<String>,
+    target_format: String,
+    output_dir: Option<String>,
+) -> Result<Vec<ConversionResult>, String> {
     let target_format = OutputFormat::parse(&target_format)?;
+    let output_dir = output_dir.as_deref().map(Path::new);
 
     Ok(paths
         .iter()
-        .map(|path| convert_one(Path::new(path), target_format))
+        .map(|path| convert_one(Path::new(path), target_format, output_dir))
         .collect())
 }

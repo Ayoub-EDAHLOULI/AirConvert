@@ -1,7 +1,15 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Moon, Sun, UploadCloud, FileImage, X, Loader2 } from "lucide-react";
+import {
+  Moon,
+  Sun,
+  UploadCloud,
+  FileImage,
+  X,
+  Loader2,
+  FolderOpen,
+} from "lucide-react";
 import { useTheme } from "./theme/useTheme";
 import { useFileDrop } from "./lib/useFileDrop";
 import {
@@ -30,6 +38,7 @@ function App() {
   const [targetFormat, setTargetFormat] = useState<OutputFormatValue>("png");
   const [isConverting, setIsConverting] = useState(false);
   const [results, setResults] = useState<ConversionResult[] | null>(null);
+  const [outputDir, setOutputDir] = useState<string | null>(null);
 
   const addPaths = useCallback((paths: string[]) => {
     setResults(null);
@@ -61,12 +70,23 @@ function App() {
             "tiff",
             "tif",
             "svg",
+            "ico",
+            "tga",
+            "pnm",
+            "qoi",
           ],
         },
       ],
     });
     if (!selected) return;
     addPaths(Array.isArray(selected) ? selected : [selected]);
+  }
+
+  async function handleChooseOutputDir() {
+    const selected = await open({ directory: true, multiple: false });
+    if (!selected) return;
+    setOutputDir(selected as string);
+    setResults(null);
   }
 
   function removeFile(path: string) {
@@ -87,6 +107,7 @@ function App() {
       const output = await invoke<ConversionResult[]>("convert_images", {
         paths: files.map((f) => f.path),
         targetFormat,
+        outputDir,
       });
       setResults(output);
     } catch (err) {
@@ -144,7 +165,7 @@ function App() {
             Drag and drop images here, or click to browse
           </p>
           <p className="text-subText text-sm">
-            jpg, png, webp, gif, bmp, tiff, svg
+            jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi
           </p>
         </button>
 
@@ -208,26 +229,53 @@ function App() {
         )}
       </div>
 
-      <footer className="border-t border-border p-4 flex items-center justify-end gap-3 shrink-0">
-        <select
-          value={targetFormat}
-          onChange={(e) => setTargetFormat(e.target.value as OutputFormatValue)}
-          className="rounded-lg border border-border bg-inputBg px-3 py-2 text-sm text-text outline-none"
-        >
-          {OUTPUT_FORMATS.map((format) => (
-            <option key={format.value} value={format.value}>
-              Convert to {format.label}
-            </option>
-          ))}
-        </select>
+      <footer className="border-t border-border p-4 flex items-center justify-between gap-3 shrink-0">
         <button
-          onClick={handleConvert}
-          disabled={files.length === 0 || isConverting}
-          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          onClick={handleChooseOutputDir}
+          className="flex items-center gap-2 min-w-0 rounded-lg border border-border bg-inputBg px-3 py-2 text-sm text-subText hover:text-text transition-colors"
         >
-          {isConverting && <Loader2 size={16} className="animate-spin" />}
-          {isConverting ? "Converting..." : "Convert"}
+          <FolderOpen size={16} className="shrink-0" />
+          <span className="truncate max-w-[280px]">
+            {outputDir ?? "Save next to original file"}
+          </span>
+          {outputDir && (
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOutputDir(null);
+                setResults(null);
+              }}
+              className="ml-1 shrink-0 hover:text-danger"
+            >
+              <X size={14} />
+            </span>
+          )}
         </button>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <select
+            value={targetFormat}
+            onChange={(e) =>
+              setTargetFormat(e.target.value as OutputFormatValue)
+            }
+            className="rounded-lg border border-border bg-inputBg px-3 py-2 text-sm text-text outline-none"
+          >
+            {OUTPUT_FORMATS.map((format) => (
+              <option key={format.value} value={format.value}>
+                Convert to {format.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleConvert}
+            disabled={files.length === 0 || isConverting}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          >
+            {isConverting && <Loader2 size={16} className="animate-spin" />}
+            {isConverting ? "Converting..." : "Convert"}
+          </button>
+        </div>
       </footer>
     </main>
   );
