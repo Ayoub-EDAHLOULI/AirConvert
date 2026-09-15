@@ -14,6 +14,11 @@
           "name": "binaries/ffmpeg",
           "sidecar": true,
           "args": true
+        },
+        {
+          "name": "binaries/pandoc",
+          "sidecar": true,
+          "args": true
         }
       ]
     }

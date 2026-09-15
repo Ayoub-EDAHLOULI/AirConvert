@@ -39,7 +39,7 @@ export const CATEGORIES: CategoryDef[] = [
     description: "Convert between document and markup formats",
     icon: FileText,
     formats: "md, txt, html, rtf, odt, docx",
-    available: false,
+    available: true,
   },
   {
     path: "/spreadsheets",

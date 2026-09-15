@@ -1,6 +1,7 @@
 use tauri::{Manager, Theme};
 
 mod audio_convert;
+mod document_convert;
 mod image_convert;
 mod output_path;
 
@@ -22,6 +23,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             image_convert::convert_images,
             audio_convert::convert_audio_files,
+            document_convert::convert_documents,
             set_window_theme
         ])
         .setup(|app| {

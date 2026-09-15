@@ -10,7 +10,7 @@ Cloud converters (Convertio, CloudConvert, etc.) upload your file to a server, c
 
 ## Status
 
-🚧 Early development. **Phase 1: Images** shipped. Currently building **Phase 2: Audio**. See [Roadmap](#roadmap) below.
+🚧 Early development. **Phase 1: Images** and **Phase 2: Audio** shipped. Currently building **Phase 3: Documents**. See [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -25,8 +25,8 @@ Phased by format category, one shipped and working before the next starts:
 | Phase       | Category     | Formats                                                                     | Approach                                                                  |
 | ----------- | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | 1 (done)    | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
-| 2 (current) | Audio        | mp3, wav, flac, ogg, m4a, aac, opus, wma                                    | Bundled FFmpeg sidecar (see licensing note below)                         |
-| 3           | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
+| 2 (done)    | Audio        | mp3, wav, flac, ogg, m4a, aac, opus, wma                                    | Bundled FFmpeg sidecar (see licensing note below)                         |
+| 3 (current) | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
 | 4           | Spreadsheets | csv, xlsx, ods                                                              | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
 | 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
 
@@ -36,6 +36,7 @@ Phased by format category, one shipped and working before the next starts:
 - **AVIF as an input format** — AirConvert can convert _to_ AVIF, but not _from_ it. Decoding AVIF needs the `dav1d` decoder, a much heavier dependency than the `ravif` encoder alone; may be added later if there's real demand.
 - **Full-fidelity Office documents** (complex docx/xlsx/pptx with embedded objects, macros, exact layout preservation) — this realistically requires a full LibreOffice headless install (700MB+), which conflicts with the goal of a small, portable, offline-first bundle. May be revisited later as an optional detected-if-installed backend, never bundled by default.
 - **PDF editing** (merge/split/compress) — planned as a separate "offline PDF toolkit" project, kept out of this repo's scope to keep it focused on format _conversion_.
+- **PDF as a conversion target** — investigated for Phase 3 and backed out. Pandoc renders PDF by delegating to an external LaTeX engine; the lightweight option (Tectonic) turned out to only support a genuinely offline local bundle in `.zip`/`.ttb` format, while its actual default bundle is only published as a legacy indexed `.tar` served over HTTP (meant to be range-requested live, not downloaded once and used as a local file) — so there's no way to get real Tectonic PDF export working without either a live network dependency (defeating the point) or a much larger, unverified undertaking (building a proper local `.ttb`/`.zip` bundle from a full TeX distribution). May be revisited if a legitimate offline-bundle source turns up, or via a different PDF engine entirely (e.g. `wkhtmltopdf`, which has no bundle/package-fetch model at all).
 
 ## Engine choices and trade-offs
 
@@ -56,6 +57,7 @@ Phased by format category, one shipped and working before the next starts:
 - Optional output folder (defaults to saving next to the source file)
 - Image conversion: optional max-dimension resize and JPG/WebP quality control
 - Audio conversion (mp3, wav, flac, ogg, m4a, aac, opus, wma) via a bundled FFmpeg sidecar
+- Document conversion (md, txt, html, rtf, odt, docx) via a bundled Pandoc sidecar — content conversion, not full-fidelity layout preservation
 - Zero network calls, verifiable by blocking network access at the OS level
 - Portable, installable desktop app (Windows-first, cross-platform as feasible)
 
@@ -81,7 +83,7 @@ grep -rn "reqwest\|TcpStream\|UdpSocket" src-tauri/src/
 
 Unlike some offline-first apps, AirConvert has no exception to carve out here — there's no HTTP plugin dependency at all (`tauri-plugin-http` is not in `Cargo.toml`), and no feature in the app has any reason to make a network request. Also confirm `src-tauri/tauri.conf.json` has no `updater`/`analytics` config block (Tauri's auto-updater is opt-in and must be explicitly configured — absence of the block means it's off).
 
-Audio conversion shells out to a bundled FFmpeg binary (`tauri-plugin-shell`'s sidecar mechanism) rather than calling a Rust crate directly — this is a real trust boundary worth being explicit about. The `shell:allow-execute` capability in `src-tauri/capabilities/default.json` is scoped to that one named sidecar (`binaries/ffmpeg`) with no other command execution permitted, so confirm that scoping hasn't been loosened. Running a local subprocess is not the same as making a network call — FFmpeg itself makes no outbound connections when simply transcoding a local file — but it's worth re-running the OS-level firewall check below specifically with an audio conversion in the test mix, not just images.
+Audio and Document conversion each shell out to a bundled binary (FFmpeg, Pandoc) via `tauri-plugin-shell`'s sidecar mechanism rather than calling a Rust crate directly — this is a real trust boundary worth being explicit about. The `shell:allow-execute` capability in `src-tauri/capabilities/default.json` is scoped to exactly those two named sidecars (`binaries/ffmpeg`, `binaries/pandoc`) with no other command execution permitted, so confirm that scoping hasn't been loosened. Running a local subprocess is not the same as making a network call — neither FFmpeg nor Pandoc make outbound connections when simply converting a local file — but it's worth re-running the OS-level firewall check below with an audio and a document conversion in the test mix, not just images.
 
 ### 2. OS-level runtime block (Windows Firewall)
 
@@ -94,7 +96,7 @@ New-NetFirewallRule -DisplayName "AirConvert-Block-Out" -Direction Outbound `
   -Program (Resolve-Path $exe) -Action Block
 ```
 
-With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), plus an audio file through the FFmpeg sidecar — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
+With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), an audio file through the FFmpeg sidecar, and a document through the Pandoc sidecar — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
 
 Remove the rule when done:
 
@@ -131,6 +133,18 @@ Phase 2 (Audio) and the Phase 5 stretch goal (Video) call a bundled FFmpeg binar
    (the target-triple suffix is Tauri's sidecar naming convention — run `rustc -vV` if you're on a different platform/architecture to get the right suffix).
 
 Without this file in place, the Rust build itself will fail (Tauri validates declared `externalBin` resources exist at build time), not just the audio conversion feature at runtime.
+
+### Pandoc sidecar (required for Documents)
+
+Phase 3 (Documents) calls a bundled Pandoc binary for the same reason Audio calls FFmpeg — no pure-Rust crate covers this format breadth (especially docx/odt) with acceptable fidelity. Same pattern as FFmpeg above:
+
+1. Download a Pandoc release for Windows from [pandoc.org/installing.html](https://pandoc.org/installing.html) (the zip archive, not the installer — extract it, don't run it) or [github.com/jgm/pandoc/releases](https://github.com/jgm/pandoc/releases).
+2. Take `pandoc.exe` and place it at:
+   ```
+   src-tauri/binaries/pandoc-x86_64-pc-windows-msvc.exe
+   ```
+
+Same build-time requirement as FFmpeg: without this file, the Rust build fails outright, not just the document conversion feature.
 
 ## Contributing
 

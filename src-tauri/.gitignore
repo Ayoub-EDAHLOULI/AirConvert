@@ -6,8 +6,9 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# FFmpeg sidecar binary — too large for git, and licensing (LGPL build)
-# means it should be fetched/verified per-machine rather than committed.
-# See README for where to get it and what filename Tauri expects.
+# Sidecar binaries (FFmpeg, Pandoc) — too large for git, and FFmpeg's
+# licensing (GPL vs LGPL builds) means it should be fetched/verified
+# per-machine rather than committed. See README for where to get each one
+# and what filename Tauri expects.
 /binaries/*
 !/binaries/.gitkeep
