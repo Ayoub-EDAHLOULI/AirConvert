@@ -31,7 +31,7 @@ export const CATEGORIES: CategoryDef[] = [
     description: "Convert between common audio formats",
     icon: Music,
     formats: "mp3, wav, flac, ogg, m4a",
-    available: false,
+    available: true,
   },
   {
     path: "/documents",

@@ -10,7 +10,7 @@ Cloud converters (Convertio, CloudConvert, etc.) upload your file to a server, c
 
 ## Status
 
-🚧 Early development. Currently scaffolding **Phase 1: Images**. See [Roadmap](#roadmap) below.
+🚧 Early development. **Phase 1: Images** shipped. Currently building **Phase 2: Audio**. See [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -24,8 +24,8 @@ Phased by format category, one shipped and working before the next starts:
 
 | Phase       | Category     | Formats                                                                     | Approach                                                                  |
 | ----------- | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 1 (current) | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
-| 2           | Audio        | mp3, wav, flac, ogg, m4a                                                    | Bundled FFmpeg (LGPL build) sidecar                                       |
+| 1 (done)    | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
+| 2 (current) | Audio        | mp3, wav, flac, ogg, m4a                                                    | Bundled FFmpeg (LGPL build) sidecar                                       |
 | 3           | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
 | 4           | Spreadsheets | csv, xlsx, ods                                                              | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
 | 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
@@ -113,6 +113,19 @@ cd airconvert-desktop
 npm install
 npm run tauri dev
 ```
+
+### FFmpeg sidecar (required for Audio and, later, Video)
+
+Phase 2 (Audio) and the Phase 5 stretch goal (Video) call a bundled FFmpeg binary rather than a pure-Rust crate — FFmpeg isn't checked into the repo (it's large, and licensing means it should be fetched per-machine rather than committed). To build or run those phases locally:
+
+1. Download a static Windows FFmpeg build — e.g. the "release essentials" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), or a release from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases).
+2. Take `ffmpeg.exe` from the archive and place it at:
+   ```
+   src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+   ```
+   (the target-triple suffix is Tauri's sidecar naming convention — run `rustc -vV` if you're on a different platform/architecture to get the right suffix).
+
+Without this file in place, the Rust build itself will fail (Tauri validates declared `externalBin` resources exist at build time), not just the audio conversion feature at runtime.
 
 ## Contributing
 

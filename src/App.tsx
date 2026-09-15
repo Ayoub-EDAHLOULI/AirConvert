@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import ImagesConverter from "./pages/ImagesConverter";
+import AudioConverter from "./pages/AudioConverter";
 import "./App.css";
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/images" element={<ImagesConverter />} />
+        <Route path="/audio" element={<AudioConverter />} />
       </Routes>
     </HashRouter>
   );
