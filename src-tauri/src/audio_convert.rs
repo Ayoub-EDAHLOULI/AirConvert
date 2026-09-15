@@ -13,6 +13,9 @@ pub enum AudioFormat {
     Flac,
     Ogg,
     M4a,
+    Aac,
+    Opus,
+    Wma,
 }
 
 impl AudioFormat {
@@ -23,6 +26,9 @@ impl AudioFormat {
             "flac" => Ok(Self::Flac),
             "ogg" => Ok(Self::Ogg),
             "m4a" => Ok(Self::M4a),
+            "aac" => Ok(Self::Aac),
+            "opus" => Ok(Self::Opus),
+            "wma" => Ok(Self::Wma),
             other => Err(format!("Unsupported target format: {other}")),
         }
     }
@@ -34,6 +40,9 @@ impl AudioFormat {
             Self::Flac => "flac",
             Self::Ogg => "ogg",
             Self::M4a => "m4a",
+            Self::Aac => "aac",
+            Self::Opus => "opus",
+            Self::Wma => "wma",
         }
     }
 
@@ -46,6 +55,9 @@ impl AudioFormat {
             Self::Flac => vec!["-c:a", "flac"],
             Self::Ogg => vec!["-c:a", "libvorbis", "-q:a", "5"],
             Self::M4a => vec!["-c:a", "aac", "-b:a", "192k"],
+            Self::Aac => vec!["-c:a", "aac", "-b:a", "192k"],
+            Self::Opus => vec!["-c:a", "libopus", "-b:a", "128k"],
+            Self::Wma => vec!["-c:a", "wmav2", "-b:a", "192k"],
         }
     }
 }

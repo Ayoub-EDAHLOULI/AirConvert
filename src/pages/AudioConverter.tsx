@@ -94,7 +94,16 @@ export default function AudioConverter() {
       filters: [
         {
           name: "Audio",
-          extensions: ["mp3", "wav", "flac", "ogg", "m4a", "aac", "wma"],
+          extensions: [
+            "mp3",
+            "wav",
+            "flac",
+            "ogg",
+            "m4a",
+            "aac",
+            "wma",
+            "opus",
+          ],
         },
       ],
     });
@@ -194,7 +203,7 @@ export default function AudioConverter() {
             Drag and drop audio files here, or click to browse
           </p>
           <p className="text-subText text-sm">
-            mp3, wav, flac, ogg, m4a, aac, wma
+            mp3, wav, flac, ogg, m4a, aac, wma, opus
           </p>
         </button>
 

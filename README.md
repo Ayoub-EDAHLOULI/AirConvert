@@ -25,7 +25,7 @@ Phased by format category, one shipped and working before the next starts:
 | Phase       | Category     | Formats                                                                     | Approach                                                                  |
 | ----------- | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | 1 (done)    | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
-| 2 (current) | Audio        | mp3, wav, flac, ogg, m4a                                                    | Bundled FFmpeg (LGPL build) sidecar                                       |
+| 2 (current) | Audio        | mp3, wav, flac, ogg, m4a, aac, opus, wma                                    | Bundled FFmpeg sidecar (see licensing note below)                         |
 | 3           | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
 | 4           | Spreadsheets | csv, xlsx, ods                                                              | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
 | 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
@@ -42,9 +42,11 @@ Phased by format category, one shipped and working before the next starts:
 | Engine                         | Used for     | Why                                                                                                                   |
 | ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------- |
 | Rust `image` + `resvg`         | Images       | Compiles directly into the binary — no subprocess, no license concerns, minimal size impact                           |
-| FFmpeg (LGPL build)            | Audio, Video | Industry-standard, well understood bundling pattern (same approach used by apps like HandBrake)                       |
+| FFmpeg                         | Audio, Video | Industry-standard, well understood bundling pattern (same approach used by apps like HandBrake); see licensing note below |
 | Pandoc                         | Documents    | Single-binary sidecar, handles markup-style formats well; explicitly not a fidelity-preserving office-document engine |
 | `calamine` / `rust_xlsxwriter` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine                                          |
+
+**FFmpeg licensing note:** during development, any static FFmpeg build works (see the [FFmpeg sidecar](#ffmpeg-sidecar-required-for-audio-and-later-video) setup below). For an actual shipped/distributed release, the specific build matters: the common "essentials"-style builds (e.g. gyan.dev's essentials build) are GPL-licensed because they bundle libx264/libx265, and bundling GPL code into a distributed binary carries GPL's copyleft obligations for that binary. AirConvert only needs FFmpeg's audio codecs (mp3/wav/flac/ogg/m4a), so a release build should use an **LGPL-only** FFmpeg build (no libx264/libx265/other GPL-only components) to keep the LGPL bundling story intact — this hasn't been done yet; the dev setup below is not release-safe as-is.
 
 ## Features
 
@@ -52,7 +54,8 @@ Phased by format category, one shipped and working before the next starts:
 - Target-format picker
 - Batch conversion (multiple files at once), with live per-file progress
 - Optional output folder (defaults to saving next to the source file)
-- Optional max-dimension resize and JPG/WebP quality control
+- Image conversion: optional max-dimension resize and JPG/WebP quality control
+- Audio conversion (mp3, wav, flac, ogg, m4a, aac, opus, wma) via a bundled FFmpeg sidecar
 - Zero network calls, verifiable by blocking network access at the OS level
 - Portable, installable desktop app (Windows-first, cross-platform as feasible)
 
@@ -78,6 +81,8 @@ grep -rn "reqwest\|TcpStream\|UdpSocket" src-tauri/src/
 
 Unlike some offline-first apps, AirConvert has no exception to carve out here — there's no HTTP plugin dependency at all (`tauri-plugin-http` is not in `Cargo.toml`), and no feature in the app has any reason to make a network request. Also confirm `src-tauri/tauri.conf.json` has no `updater`/`analytics` config block (Tauri's auto-updater is opt-in and must be explicitly configured — absence of the block means it's off).
 
+Audio conversion shells out to a bundled FFmpeg binary (`tauri-plugin-shell`'s sidecar mechanism) rather than calling a Rust crate directly — this is a real trust boundary worth being explicit about. The `shell:allow-execute` capability in `src-tauri/capabilities/default.json` is scoped to that one named sidecar (`binaries/ffmpeg`) with no other command execution permitted, so confirm that scoping hasn't been loosened. Running a local subprocess is not the same as making a network call — FFmpeg itself makes no outbound connections when simply transcoding a local file — but it's worth re-running the OS-level firewall check below specifically with an audio conversion in the test mix, not just images.
+
 ### 2. OS-level runtime block (Windows Firewall)
 
 Build the release binary, then block all outbound traffic for it and confirm every conversion still works:
@@ -89,7 +94,7 @@ New-NetFirewallRule -DisplayName "AirConvert-Block-Out" -Direction Outbound `
   -Program (Resolve-Path $exe) -Action Block
 ```
 
-With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output) — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
+With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), plus an audio file through the FFmpeg sidecar — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
 
 Remove the rule when done:
 

@@ -6,6 +6,7 @@ export const SUPPORTED_INPUT_EXTENSIONS = [
   "m4a",
   "aac",
   "wma",
+  "opus",
 ] as const;
 
 export const OUTPUT_FORMATS = [
@@ -14,6 +15,9 @@ export const OUTPUT_FORMATS = [
   { value: "flac", label: "FLAC" },
   { value: "ogg", label: "OGG" },
   { value: "m4a", label: "M4A" },
+  { value: "aac", label: "AAC" },
+  { value: "opus", label: "Opus" },
+  { value: "wma", label: "WMA" },
 ] as const;
 
 export type OutputFormatValue = (typeof OUTPUT_FORMATS)[number]["value"];

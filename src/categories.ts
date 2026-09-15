@@ -30,7 +30,7 @@ export const CATEGORIES: CategoryDef[] = [
     label: "Audio",
     description: "Convert between common audio formats",
     icon: Music,
-    formats: "mp3, wav, flac, ogg, m4a",
+    formats: "mp3, wav, flac, ogg, m4a, aac, opus, wma",
     available: true,
   },
   {
