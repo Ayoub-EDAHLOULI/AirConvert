@@ -10,7 +10,7 @@ Cloud converters (Convertio, CloudConvert, etc.) upload your file to a server, c
 
 ## Status
 
-🚧 Early development. **Phase 1: Images** and **Phase 2: Audio** shipped. Currently building **Phase 3: Documents**. See [Roadmap](#roadmap) below.
+🚧 Early development. **Phase 1: Images**, **Phase 2: Audio**, and **Phase 3: Documents** shipped. Currently building **Phase 4: Spreadsheets**. See [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -26,8 +26,8 @@ Phased by format category, one shipped and working before the next starts:
 | ----------- | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | 1 (done)    | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
 | 2 (done)    | Audio        | mp3, wav, flac, ogg, m4a, aac, opus, wma                                    | Bundled FFmpeg sidecar (see licensing note below)                         |
-| 3 (current) | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
-| 4           | Spreadsheets | csv, xlsx, ods                                                              | Pure Rust (`calamine`, `rust_xlsxwriter`) — data only, no formulas/macros |
+| 3 (done)    | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
+| 4 (current) | Spreadsheets | csv, xlsx, xls, ods (ods/xls input only)                                    | Pure Rust (`calamine`, `rust_xlsxwriter`, `csv`) — data only, no formulas/macros |
 | 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
 
 **Deliberately out of scope for now:**
@@ -37,6 +37,7 @@ Phased by format category, one shipped and working before the next starts:
 - **Full-fidelity Office documents** (complex docx/xlsx/pptx with embedded objects, macros, exact layout preservation) — this realistically requires a full LibreOffice headless install (700MB+), which conflicts with the goal of a small, portable, offline-first bundle. May be revisited later as an optional detected-if-installed backend, never bundled by default.
 - **PDF editing** (merge/split/compress) — planned as a separate "offline PDF toolkit" project, kept out of this repo's scope to keep it focused on format _conversion_.
 - **PDF as a conversion target** — investigated for Phase 3 and backed out. Pandoc renders PDF by delegating to an external LaTeX engine; the lightweight option (Tectonic) turned out to only support a genuinely offline local bundle in `.zip`/`.ttb` format, while its actual default bundle is only published as a legacy indexed `.tar` served over HTTP (meant to be range-requested live, not downloaded once and used as a local file) — so there's no way to get real Tectonic PDF export working without either a live network dependency (defeating the point) or a much larger, unverified undertaking (building a proper local `.ttb`/`.zip` bundle from a full TeX distribution). May be revisited if a legitimate offline-bundle source turns up, or via a different PDF engine entirely (e.g. `wkhtmltopdf`, which has no bundle/package-fetch model at all).
+- **ODS as a conversion target** — ODS is readable (calamine supports it as an input format natively) but not writable: there's no mature pure-Rust ODS writer comparable to `rust_xlsxwriter` for xlsx. The output picker only offers csv and xlsx.
 
 ## Engine choices and trade-offs
 
@@ -45,7 +46,7 @@ Phased by format category, one shipped and working before the next starts:
 | Rust `image` + `resvg`         | Images       | Compiles directly into the binary — no subprocess, no license concerns, minimal size impact                           |
 | FFmpeg                         | Audio, Video | Industry-standard, well understood bundling pattern (same approach used by apps like HandBrake); see licensing note below |
 | Pandoc                         | Documents    | Single-binary sidecar, handles markup-style formats well; explicitly not a fidelity-preserving office-document engine |
-| `calamine` / `rust_xlsxwriter` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine                                          |
+| `calamine` / `rust_xlsxwriter` / `csv` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine. `calamine` reads xlsx/xls/ods; the `csv` crate handles CSV directly since `calamine` has no CSV support at all |
 
 **FFmpeg licensing note:** during development, any static FFmpeg build works (see the [FFmpeg sidecar](#ffmpeg-sidecar-required-for-audio-and-later-video) setup below). For an actual shipped/distributed release, the specific build matters: the common "essentials"-style builds (e.g. gyan.dev's essentials build) are GPL-licensed because they bundle libx264/libx265, and bundling GPL code into a distributed binary carries GPL's copyleft obligations for that binary. AirConvert only needs FFmpeg's audio codecs (mp3/wav/flac/ogg/m4a), so a release build should use an **LGPL-only** FFmpeg build (no libx264/libx265/other GPL-only components) to keep the LGPL bundling story intact — this hasn't been done yet; the dev setup below is not release-safe as-is.
 
@@ -58,6 +59,7 @@ Phased by format category, one shipped and working before the next starts:
 - Image conversion: optional max-dimension resize and JPG/WebP quality control
 - Audio conversion (mp3, wav, flac, ogg, m4a, aac, opus, wma) via a bundled FFmpeg sidecar
 - Document conversion (md, txt, html, rtf, odt, docx) via a bundled Pandoc sidecar — content conversion, not full-fidelity layout preservation
+- Spreadsheet conversion (csv, xlsx, xls, ods as input; csv, xlsx as output) — first worksheet only, data values only, no formulas/macros/styling
 - Zero network calls, verifiable by blocking network access at the OS level
 - Portable, installable desktop app (Windows-first, cross-platform as feasible)
 
@@ -96,7 +98,7 @@ New-NetFirewallRule -DisplayName "AirConvert-Block-Out" -Direction Outbound `
   -Program (Resolve-Path $exe) -Action Block
 ```
 
-With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), an audio file through the FFmpeg sidecar, and a document through the Pandoc sidecar — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network.
+With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), an audio file through the FFmpeg sidecar, a document through the Pandoc sidecar, and a spreadsheet (csv/xlsx/ods) — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network. Spreadsheet conversion is pure Rust with no sidecar, so it's included mainly as a sanity check rather than because it's a new trust boundary.
 
 Remove the rule when done:
 

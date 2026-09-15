@@ -46,8 +46,8 @@ export const CATEGORIES: CategoryDef[] = [
     label: "Spreadsheets",
     description: "Convert between spreadsheet and data formats",
     icon: Sheet,
-    formats: "csv, xlsx, ods",
-    available: false,
+    formats: "csv, xlsx, xls, ods (ods input only)",
+    available: true,
   },
   {
     path: "/video",

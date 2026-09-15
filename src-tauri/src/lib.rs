@@ -4,6 +4,7 @@ mod audio_convert;
 mod document_convert;
 mod image_convert;
 mod output_path;
+mod spreadsheet_convert;
 
 #[tauri::command]
 fn set_window_theme(window: tauri::WebviewWindow, theme: String) {
@@ -24,6 +25,7 @@ pub fn run() {
             image_convert::convert_images,
             audio_convert::convert_audio_files,
             document_convert::convert_documents,
+            spreadsheet_convert::convert_spreadsheets,
             set_window_theme
         ])
         .setup(|app| {
