@@ -13,9 +13,11 @@ import {
   FolderOpen,
   CheckCircle2,
   ArrowLeft,
+  Square,
 } from "lucide-react";
 import { useTheme } from "../theme/useTheme";
 import { useFileDrop } from "../lib/useFileDrop";
+import { useConverterPrefs } from "../lib/useConverterPrefs";
 import {
   OUTPUT_FORMATS,
   extensionOf,
@@ -45,10 +47,10 @@ type ConversionProgress = {
 export default function AudioConverter() {
   const { theme, toggleTheme } = useTheme();
   const [files, setFiles] = useState<QueuedFile[]>([]);
-  const [targetFormat, setTargetFormat] = useState<OutputFormatValue>("mp3");
+  const { targetFormat, setTargetFormat, outputDir, setOutputDir } =
+    useConverterPrefs<OutputFormatValue>("audio", "mp3");
   const [isConverting, setIsConverting] = useState(false);
   const [results, setResults] = useState<ConversionResult[] | null>(null);
-  const [outputDir, setOutputDir] = useState<string | null>(null);
   const [progress, setProgress] = useState<{
     completed: number;
     total: number;
@@ -154,6 +156,10 @@ export default function AudioConverter() {
     } finally {
       setIsConverting(false);
     }
+  }
+
+  async function handleCancel() {
+    await invoke("cancel_conversion");
   }
 
   const resultByPath = new Map((results ?? []).map((r) => [r.source_path, r]));
@@ -322,14 +328,23 @@ export default function AudioConverter() {
                 </option>
               ))}
             </select>
-            <button
-              onClick={handleConvert}
-              disabled={files.length === 0 || isConverting}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-            >
-              {isConverting && <Loader2 size={16} className="animate-spin" />}
-              {isConverting ? "Converting..." : "Convert"}
-            </button>
+            {isConverting ? (
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-2 rounded-lg border border-danger px-5 py-2 text-sm font-medium text-danger hover:bg-danger hover:text-white transition-colors"
+              >
+                <Square size={14} />
+                Cancel
+              </button>
+            ) : (
+              <button
+                onClick={handleConvert}
+                disabled={files.length === 0}
+                className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                Convert
+              </button>
+            )}
           </div>
         </div>
       </footer>

@@ -55,8 +55,8 @@ Phased by format category, one shipped and working before the next starts:
 
 - Drag-and-drop file input with format auto-detection
 - Target-format picker
-- Batch conversion (multiple files at once), with live per-file progress
-- Optional output folder (defaults to saving next to the source file)
+- Batch conversion (multiple files at once), with live per-file progress and a Cancel button that stops the batch after the current file finishes
+- Optional output folder (defaults to saving next to the source file) and target format, both remembered per category between sessions
 - Image conversion: optional max-dimension resize and JPG/WebP quality control
 - Audio conversion (mp3, wav, flac, ogg, m4a, aac, opus, wma) via a bundled FFmpeg sidecar
 - Document conversion (md, txt, html, rtf, odt, docx) via a bundled Pandoc sidecar — content conversion, not full-fidelity layout preservation

@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::ShellExt;
 
+use crate::cancellation::CancellationState;
 use crate::output_path::unique_output_path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +157,7 @@ async fn convert_one(
 #[tauri::command]
 pub async fn convert_audio_files(
     app: AppHandle,
+    cancellation: tauri::State<'_, CancellationState>,
     paths: Vec<String>,
     target_format: String,
     output_dir: Option<String>,
@@ -164,8 +166,14 @@ pub async fn convert_audio_files(
     let output_dir = output_dir.as_deref().map(Path::new);
     let total = paths.len();
 
+    cancellation.reset();
+
     let mut results = Vec::with_capacity(total);
     for (index, path) in paths.iter().enumerate() {
+        if cancellation.is_cancelled() {
+            break;
+        }
+
         let result = convert_one(&app, Path::new(path), target_format, output_dir).await;
 
         let _ = app.emit(

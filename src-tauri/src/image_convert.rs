@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use tauri::Emitter;
 
+use crate::cancellation::CancellationState;
 use crate::output_path::unique_output_path;
 
 /// Formats we accept as conversion output. SVG is intentionally excluded:
@@ -223,6 +224,7 @@ struct ConversionProgress {
 #[tauri::command]
 pub fn convert_images(
     app: tauri::AppHandle,
+    cancellation: tauri::State<'_, CancellationState>,
     paths: Vec<String>,
     target_format: String,
     output_dir: Option<String>,
@@ -236,8 +238,14 @@ pub fn convert_images(
     });
     let total = paths.len();
 
+    cancellation.reset();
+
     let mut results = Vec::with_capacity(total);
     for (index, path) in paths.iter().enumerate() {
+        if cancellation.is_cancelled() {
+            break;
+        }
+
         let result = convert_one(Path::new(path), target_format, output_dir, options);
 
         let _ = app.emit(

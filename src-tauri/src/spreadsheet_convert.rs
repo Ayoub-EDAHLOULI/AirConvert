@@ -4,6 +4,7 @@ use calamine::{open_workbook_auto, Data, Reader};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+use crate::cancellation::CancellationState;
 use crate::output_path::unique_output_path;
 
 /// Data-only spreadsheet conversion: no formulas, no macros, no styling —
@@ -250,6 +251,7 @@ mod tests {
 #[tauri::command]
 pub fn convert_spreadsheets(
     app: AppHandle,
+    cancellation: tauri::State<'_, CancellationState>,
     paths: Vec<String>,
     target_format: String,
     output_dir: Option<String>,
@@ -258,8 +260,14 @@ pub fn convert_spreadsheets(
     let output_dir = output_dir.as_deref().map(Path::new);
     let total = paths.len();
 
+    cancellation.reset();
+
     let mut results = Vec::with_capacity(total);
     for (index, path) in paths.iter().enumerate() {
+        if cancellation.is_cancelled() {
+            break;
+        }
+
         let result = convert_one(Path::new(path), target_format, output_dir);
 
         let _ = app.emit(
