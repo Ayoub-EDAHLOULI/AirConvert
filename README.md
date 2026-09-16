@@ -10,7 +10,7 @@ Cloud converters (Convertio, CloudConvert, etc.) upload your file to a server, c
 
 ## Status
 
-🚧 Early development. **Phase 1: Images**, **Phase 2: Audio**, and **Phase 3: Documents** shipped. Currently building **Phase 4: Spreadsheets**. See [Roadmap](#roadmap) below.
+🚧 **Phase 1: Images**, **Phase 2: Audio**, **Phase 3: Documents**, **Phase 4: Spreadsheets**, and the **Phase 5: Video** stretch goal are all shipped. See [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -27,8 +27,8 @@ Phased by format category, one shipped and working before the next starts:
 | 1 (done)    | Images       | jpg, png, webp, gif, bmp, tiff, svg, ico, tga, pnm, qoi, avif (output only) | Pure Rust (`image`, `resvg`) — no external binaries                       |
 | 2 (done)    | Audio        | mp3, wav, flac, ogg, m4a, aac, opus, wma                                    | Bundled FFmpeg sidecar (see licensing note below)                         |
 | 3 (done)    | Documents    | md, txt, html, rtf, odt, docx                                               | Bundled Pandoc sidecar — content conversion, not full-fidelity layout     |
-| 4 (current) | Spreadsheets | csv, xlsx, xls, ods (ods/xls input only)                                    | Pure Rust (`calamine`, `rust_xlsxwriter`, `csv`) — data only, no formulas/macros |
-| 5 (stretch) | Video        | mp4, mov, avi, webm, gif                                                    | FFmpeg sidecar                                                            |
+| 4 (done)    | Spreadsheets | csv, xlsx, xls, ods (ods/xls input only)                                    | Pure Rust (`calamine`, `rust_xlsxwriter`, `csv`) — data only, no formulas/macros |
+| 5 (done, stretch) | Video  | mp4, mov, avi, webm, gif, mkv, flv, wmv (mkv/flv/wmv input only)            | Bundled FFmpeg sidecar (same binary as Audio)                             |
 
 **Deliberately out of scope for now:**
 
@@ -38,6 +38,7 @@ Phased by format category, one shipped and working before the next starts:
 - **PDF editing** (merge/split/compress) — planned as a separate "offline PDF toolkit" project, kept out of this repo's scope to keep it focused on format _conversion_.
 - **PDF as a conversion target** — investigated for Phase 3 and backed out. Pandoc renders PDF by delegating to an external LaTeX engine; the lightweight option (Tectonic) turned out to only support a genuinely offline local bundle in `.zip`/`.ttb` format, while its actual default bundle is only published as a legacy indexed `.tar` served over HTTP (meant to be range-requested live, not downloaded once and used as a local file) — so there's no way to get real Tectonic PDF export working without either a live network dependency (defeating the point) or a much larger, unverified undertaking (building a proper local `.ttb`/`.zip` bundle from a full TeX distribution). May be revisited if a legitimate offline-bundle source turns up, or via a different PDF engine entirely (e.g. `wkhtmltopdf`, which has no bundle/package-fetch model at all).
 - **ODS as a conversion target** — ODS is readable (calamine supports it as an input format natively) but not writable: there's no mature pure-Rust ODS writer comparable to `rust_xlsxwriter` for xlsx. The output picker only offers csv and xlsx.
+- **Video resolution/bitrate controls** — Phase 5 ships with fixed, sensible default codec settings (h264 for mp4/mov, mpeg4 for avi, vp9 for webm) and no user-facing quality/resolution picker yet, matching how Images and Audio started before quality controls were added later. May be added if there's real demand.
 
 ## Engine choices and trade-offs
 
@@ -48,7 +49,7 @@ Phased by format category, one shipped and working before the next starts:
 | Pandoc                         | Documents    | Single-binary sidecar, handles markup-style formats well; explicitly not a fidelity-preserving office-document engine |
 | `calamine` / `rust_xlsxwriter` / `csv` | Spreadsheets | Pure Rust, handles tabular data without pulling in a full spreadsheet engine. `calamine` reads xlsx/xls/ods; the `csv` crate handles CSV directly since `calamine` has no CSV support at all |
 
-**FFmpeg licensing note:** during development, any static FFmpeg build works (see the [FFmpeg sidecar](#ffmpeg-sidecar-required-for-audio-and-later-video) setup below). For an actual shipped/distributed release, the specific build matters: the common "essentials"-style builds (e.g. gyan.dev's essentials build) are GPL-licensed because they bundle libx264/libx265, and bundling GPL code into a distributed binary carries GPL's copyleft obligations for that binary. AirConvert only needs FFmpeg's audio codecs (mp3/wav/flac/ogg/m4a), so a release build should use an **LGPL-only** FFmpeg build (no libx264/libx265/other GPL-only components) to keep the LGPL bundling story intact — this hasn't been done yet; the dev setup below is not release-safe as-is.
+**FFmpeg licensing note:** during development, any static FFmpeg build works (see the [FFmpeg sidecar](#ffmpeg-sidecar-required-for-audio-and-video) setup below). For an actual shipped/distributed release, the specific build matters: the common "essentials"-style builds (e.g. gyan.dev's essentials build) are GPL-licensed because they bundle libx264/libx265, and bundling GPL code into a distributed binary carries GPL's copyleft obligations for that binary. This was originally going to be avoidable by using an LGPL-only build, since Phase 2 (Audio) only needs FFmpeg's audio codecs — but Phase 5 (Video) actually needs libx264 (mp4/mov) and libvpx (webm) for its own encoders, so the GPL dependency is now a real, unavoidable part of AirConvert's build. A release build should therefore either accept GPL's obligations for the whole app, or drop h264/vp9 output in favor of GPL-free alternatives (e.g. mpeg4/theora) — this hasn't been decided yet; the dev setup below is not release-safe as-is.
 
 ## Features
 
@@ -60,6 +61,7 @@ Phased by format category, one shipped and working before the next starts:
 - Audio conversion (mp3, wav, flac, ogg, m4a, aac, opus, wma) via a bundled FFmpeg sidecar
 - Document conversion (md, txt, html, rtf, odt, docx) via a bundled Pandoc sidecar — content conversion, not full-fidelity layout preservation
 - Spreadsheet conversion (csv, xlsx, xls, ods as input; csv, xlsx as output) — first worksheet only, data values only, no formulas/macros/styling
+- Video conversion (mp4, mov, avi, webm, gif, plus mkv/flv/wmv as extra inputs) via the same bundled FFmpeg sidecar as Audio, including a two-pass palette-based GIF encode for decent color quality
 - Zero network calls, verifiable by blocking network access at the OS level
 - Portable, installable desktop app (Windows-first, cross-platform as feasible)
 
@@ -85,7 +87,7 @@ grep -rn "reqwest\|TcpStream\|UdpSocket" src-tauri/src/
 
 Unlike some offline-first apps, AirConvert has no exception to carve out here — there's no HTTP plugin dependency at all (`tauri-plugin-http` is not in `Cargo.toml`), and no feature in the app has any reason to make a network request. Also confirm `src-tauri/tauri.conf.json` has no `updater`/`analytics` config block (Tauri's auto-updater is opt-in and must be explicitly configured — absence of the block means it's off).
 
-Audio and Document conversion each shell out to a bundled binary (FFmpeg, Pandoc) via `tauri-plugin-shell`'s sidecar mechanism rather than calling a Rust crate directly — this is a real trust boundary worth being explicit about. The `shell:allow-execute` capability in `src-tauri/capabilities/default.json` is scoped to exactly those two named sidecars (`binaries/ffmpeg`, `binaries/pandoc`) with no other command execution permitted, so confirm that scoping hasn't been loosened. Running a local subprocess is not the same as making a network call — neither FFmpeg nor Pandoc make outbound connections when simply converting a local file — but it's worth re-running the OS-level firewall check below with an audio and a document conversion in the test mix, not just images.
+Audio, Video, and Document conversion each shell out to a bundled binary (FFmpeg, Pandoc) via `tauri-plugin-shell`'s sidecar mechanism rather than calling a Rust crate directly — this is a real trust boundary worth being explicit about. The `shell:allow-execute` capability in `src-tauri/capabilities/default.json` is scoped to exactly those two named sidecars (`binaries/ffmpeg`, `binaries/pandoc`) with no other command execution permitted, so confirm that scoping hasn't been loosened. Running a local subprocess is not the same as making a network call — neither FFmpeg nor Pandoc make outbound connections when simply converting a local file — but it's worth re-running the OS-level firewall check below with an audio conversion, a video conversion (including a GIF export, which runs FFmpeg twice), and a document conversion in the test mix, not just images.
 
 ### 2. OS-level runtime block (Windows Firewall)
 
@@ -98,7 +100,7 @@ New-NetFirewallRule -DisplayName "AirConvert-Block-Out" -Direction Outbound `
   -Program (Resolve-Path $exe) -Action Block
 ```
 
-With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), an audio file through the FFmpeg sidecar, a document through the Pandoc sidecar, and a spreadsheet (csv/xlsx/ods) — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network. Spreadsheet conversion is pure Rust with no sidecar, so it's included mainly as a sanity check rather than because it's a new trust boundary.
+With the rule active, launch the app and convert a batch of images across a few formats (including an SVG input and an AVIF output), an audio file through the FFmpeg sidecar, a video file (including one converted to GIF), a document through the Pandoc sidecar, and a spreadsheet (csv/xlsx/ods) — everything should work identically to an unblocked run, since no part of the conversion pipeline touches the network. Spreadsheet conversion is pure Rust with no sidecar, so it's included mainly as a sanity check rather than because it's a new trust boundary.
 
 Remove the rule when done:
 
@@ -123,9 +125,9 @@ npm install
 npm run tauri dev
 ```
 
-### FFmpeg sidecar (required for Audio and, later, Video)
+### FFmpeg sidecar (required for Audio and Video)
 
-Phase 2 (Audio) and the Phase 5 stretch goal (Video) call a bundled FFmpeg binary rather than a pure-Rust crate — FFmpeg isn't checked into the repo (it's large, and licensing means it should be fetched per-machine rather than committed). To build or run those phases locally:
+Phase 2 (Audio) and Phase 5 (Video) share the same bundled FFmpeg binary rather than a pure-Rust crate — FFmpeg isn't checked into the repo (it's large, and licensing means it should be fetched per-machine rather than committed). To build or run those phases locally:
 
 1. Download a static Windows FFmpeg build — e.g. the "release essentials" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), or a release from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases).
 2. Take `ffmpeg.exe` from the archive and place it at:

@@ -55,6 +55,6 @@ export const CATEGORIES: CategoryDef[] = [
     description: "Convert between common video formats",
     icon: Video,
     formats: "mp4, mov, avi, webm, gif",
-    available: false,
+    available: true,
   },
 ];

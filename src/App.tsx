@@ -4,6 +4,7 @@ import ImagesConverter from "./pages/ImagesConverter";
 import AudioConverter from "./pages/AudioConverter";
 import DocumentsConverter from "./pages/DocumentsConverter";
 import SpreadsheetsConverter from "./pages/SpreadsheetsConverter";
+import VideoConverter from "./pages/VideoConverter";
 import "./App.css";
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
         <Route path="/audio" element={<AudioConverter />} />
         <Route path="/documents" element={<DocumentsConverter />} />
         <Route path="/spreadsheets" element={<SpreadsheetsConverter />} />
+        <Route path="/video" element={<VideoConverter />} />
       </Routes>
     </HashRouter>
   );
