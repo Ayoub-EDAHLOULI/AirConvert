@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Moon, Sun, PackageOpen } from "lucide-react";
+import { Moon, Sun, RefreshCw } from "lucide-react";
 import { useTheme } from "../theme/useTheme";
 import { CATEGORIES } from "../categories";
 
@@ -10,7 +10,7 @@ export default function Home() {
     <main className="h-screen w-screen bg-background flex flex-col overflow-hidden">
       <header className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
         <div className="flex items-center">
-          <PackageOpen className="text-primary w-6 h-6 mr-3" />
+          <RefreshCw className="text-primary w-6 h-6 mr-3" />
           <h1 className="text-lg font-bold text-text tracking-wide">
             AirConvert
           </h1>
