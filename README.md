@@ -242,11 +242,15 @@ licensing varies by build — see below), so each needs to be fetched once
 per machine:
 
 **FFmpeg** (Audio + Video)
-1. Download a static Windows build — e.g. the "release essentials" build
-   from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), or a release from
-   [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases).
-2. Place `ffmpeg.exe` at `src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe`
-   (the target-triple suffix is Tauri's sidecar naming convention — run
+1. Download the **LGPL** static Windows build from
+   [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases) —
+   specifically `ffmpeg-master-latest-win64-lgpl.zip`. Don't substitute a
+   GPL build (e.g. gyan.dev's "essentials" builds): see
+   [Engine choices and licensing](#%EF%B8%8F-engine-choices-and-licensing)
+   below for why this specific build matters.
+2. Place `ffmpeg.exe` (inside the zip's `bin/` folder) at
+   `src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe` (the
+   target-triple suffix is Tauri's sidecar naming convention — run
    `rustc -vV` for the right suffix on another platform/architecture).
 
 **Pandoc** (Documents)
@@ -272,20 +276,22 @@ per machine:
 
 ### ⚖️ Engine choices and licensing
 
-FFmpeg's licensing depends on which build you use, and this matters before
-distributing a release: common "essentials"-style builds (e.g. gyan.dev's)
-are **GPL**-licensed because they bundle `libx264`/`libx265`, and bundling
-GPL code into a distributed binary carries GPL's copyleft obligations for
-that binary.
+FFmpeg's licensing depends on which build you use. Common "essentials"-style
+builds (e.g. gyan.dev's) are **GPL**-licensed because they bundle
+`libx264`/`libx265`, and bundling GPL code into a distributed binary
+carries GPL's copyleft obligations for that binary — not something to
+inherit by accident.
 
-This was originally avoidable with an **LGPL-only** build, since Audio
-alone only needs FFmpeg's audio codecs — but Video needs `libx264`
-(mp4/mov) and `libvpx` (webm) for its own encoders, so the GPL dependency
-is now a real, unavoidable part of a build that includes Video. A release
-build should either accept GPL's obligations for the whole app, or drop
-h264/vp9 output in favor of GPL-free alternatives (e.g. mpeg4/theora) —
-this hasn't been decided yet, so the dev setup above is not release-safe
-as-is.
+AirConvert bundles [BtbN's **LGPL-only** FFmpeg build](https://github.com/BtbN/FFmpeg-Builds/releases)
+instead (`ffmpeg-master-latest-win64-lgpl.zip`), which excludes
+`libx264`/`libx265` entirely (`--disable-libx264 --disable-libx265` in its
+own build configuration). mp4/mov output uses `libopenh264` — Cisco's
+BSD-licensed, patent-fee-prepaid H.264 encoder — instead of `libx264`, so
+Video still produces real H.264 rather than falling back to a lower-quality
+codec like mpeg4. webm (`libvpx`-vp9) and all of Audio's codecs
+(`libmp3lame`, `libopus`, `libvorbis`, `flac`, `wmav2`, `aac`) are present
+in this build with no changes needed. Every format and codec path was
+re-verified end-to-end against this exact binary before it was adopted.
 
 ---
 
@@ -337,8 +343,8 @@ next started.
 
 </details>
 
-**Up next:** a release-safe FFmpeg licensing decision, and a completed
-OS-level offline verification run against a signed build.
+**Up next:** a completed OS-level offline verification run against a
+signed release build.
 
 ---
 

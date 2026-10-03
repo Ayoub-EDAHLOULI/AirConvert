@@ -42,10 +42,17 @@ impl VideoFormat {
     /// where applicable). GIF has no entry here — it has no audio track
     /// and needs a dedicated two-pass palette pipeline (see
     /// `convert_to_gif`), not a plain -c:v/-c:a pair.
+    ///
+    /// mp4/mov use `libopenh264` rather than `libx264`: the bundled FFmpeg
+    /// is built LGPL-only (no libx264/libx265, which have no LGPL variant
+    /// and would make redistributing this binary carry GPL's copyleft
+    /// obligations). `libopenh264` is Cisco's BSD-licensed, patent-fee-
+    /// prepaid H.264 implementation — a real H.264 encoder, not a
+    /// downgrade to mpeg4, and it keeps the whole app LGPL-clean.
     fn encode_args(self) -> Vec<&'static str> {
         match self {
-            Self::Mp4 => vec!["-c:v", "libx264", "-c:a", "aac", "-b:a", "192k"],
-            Self::Mov => vec!["-c:v", "libx264", "-c:a", "aac", "-b:a", "192k"],
+            Self::Mp4 => vec!["-c:v", "libopenh264", "-c:a", "aac", "-b:a", "192k"],
+            Self::Mov => vec!["-c:v", "libopenh264", "-c:a", "aac", "-b:a", "192k"],
             Self::Avi => vec!["-c:v", "mpeg4", "-c:a", "libmp3lame"],
             Self::WebM => vec!["-c:v", "libvpx-vp9", "-c:a", "libopus"],
             Self::Gif => unreachable!("GIF uses convert_to_gif, not encode_args"),
